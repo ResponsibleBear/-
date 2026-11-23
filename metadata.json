@@ -1,0 +1,6 @@
+{
+  "name": "Алиса Дом",
+  "description": "Приложение для Android (PWA + нативный Kotlin проект) для управления устройствами Яндекс Алисы через Yandex Smart Home API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

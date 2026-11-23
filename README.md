@@ -1,11 +1,109 @@
-<div align="center">
+# Алиса Дом
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Приложение для управления устройствами умного дома Яндекс Алисы через официальный **Yandex Smart Home API** (`https://api.iot.yandex.net/v1.0`).
 
-  <h1>Built with AI Studio</h2>
+Репозиторий содержит:
+1. **Нативное Android-приложение** (`android-app/`) — Kotlin, Jetpack Compose, Material 3, OkHttp, `EncryptedSharedPreferences`, виджет рабочего стола и плитки быстрых настроек Android.
+2. **Веб-интерфейс и серверную часть** (`src/` + `server.ts`) — предпросмотр интерфейса в браузере, OAuth-прокси для Яндекса и выгрузка готового ZIP-архива Android-проекта (`GET /api/android-project.zip`).
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+---
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Возможности Android-приложения
 
-</div>
+- **Два главных экрана с переключением свайпом** (`HorizontalPager` + нижняя навигация):
+  - **Выключатели** (`devices.types.switch`)
+  - **Остальное** (свет, климат, розетки, техника, датчики и прочие устройства)
+- **Управление в одно касание**: плитка полностью кликабельна — нажатие сразу отправляет команду Вкл/Выкл без лишних диалогов. На карточке сначала жирным показаны комната и статус, ниже — название устройства.
+- **Долгое нажатие на плитку**: настройка яркости (для диммируемых ламп), добавление в избранное, изменение порядка, скрытие устройства, привязка к виджету и плиткам шторки.
+- **Кнопка «Выкл всё»** в верхней панели экрана «Выключатели» для одновременного отключения всех активных устройств.
+- **Виджет рабочего стола (4×2)** (`AliceSwitchesWidgetProvider`) — быстрый просмотр и переключение до 4 выбранных устройств, кнопка обновления и «Выкл всё».
+- **Плитки быстрых настроек Android** (`TileService`) — 3 плитки для шторки уведомлений («Свет 1», «Свет 2», «Выкл всё»).
+- **Pull-to-Refresh и автообновление** при возврате приложения из фона (`ON_RESUME`).
+- **Безопасное хранение токена**: OAuth-токен Яндекса шифруется локально на устройстве через `EncryptedSharedPreferences` (`AES256_GCM`).
+
+---
+
+## Структура репозитория
+
+```text
+.
+├── android-app/                 # Нативный Android-проект (Kotlin + Jetpack Compose)
+│   ├── app/
+│   │   ├── build.gradle.kts     # Зависимости, compileSdk 35, minSdk 26, Java 17
+│   │   └── src/main/
+│   │       ├── AndroidManifest.xml
+│   │       ├── java/ru/alicedom/app/
+│   │       │   ├── data/        # SecureTokenStore, DevicePrefsStore, YandexSmartHomeClient
+│   │       │   ├── tiles/       # Quick Settings TileService (шторка Android)
+│   │       │   ├── ui/          # MainActivity и Compose-экраны
+│   │       │   └── widget/      # Виджет рабочего стола 4×2
+│   │       └── res/             # XML-разметка виджета, иконки, цвета и строки
+│   ├── build.gradle.kts         # AGP 9.0.0, Kotlin Compose 2.2.10
+│   └── gradle/wrapper/          # Gradle 9.1.0 (совместим с JDK 17–25)
+├── src/                         # Веб-клиент на React + TypeScript + Tailwind CSS
+├── server.ts                    # Express + Vite сервер, API-прокси и генератор android-project.zip
+├── public/                      # Статические ресурсы (иконка)
+├── .env.example                 # Шаблон переменных окружения (без секретов)
+└── package.json
+```
+
+---
+
+## Сборка Android APK в Android Studio
+
+1. Откройте папку `android-app/` в **Android Studio** (или скачайте архив через кнопку в веб-интерфейсе и распакуйте его).
+2. Дождитесь окончания **Gradle Sync**:
+   - Gradle Wrapper: **9.1.0**
+   - Android Gradle Plugin: **9.0.0**
+   - Поддерживаемый Gradle JDK: **17–25**
+   - `minSdk`: **26** (Android 8.0+), `targetSdk`: **35**
+3. Запустите на эмуляторе/телефоне (`Run`) или соберите APK через **Build → Build Bundle(s) / APK(s) → Build APK(s)**.
+
+---
+
+## Локальный запуск веб-версии
+
+### Требования
+- Node.js 20+ (или совместимый рантайм)
+
+### Установка и запуск
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
+После запуска веб-интерфейс доступен по адресу `http://localhost:3000`.
+
+### Переменные окружения (`.env`)
+| Переменная | Обязательность | Описание |
+|---|---|---|
+| `YANDEX_CLIENT_ID` | Опционально | Client ID приложения из [Яндекс OAuth](https://oauth.yandex.ru/) для входа через OAuth-окно |
+| `YANDEX_CLIENT_SECRET` | Опционально | Client Secret приложения Яндекс OAuth (используется только на сервере в `server.ts`) |
+| `APP_URL` | Опционально | Публичный URL приложения для OAuth callback (по умолчанию `http://localhost:3000`) |
+| `SESSION_SECRET` | Опционально | Ключ подписи и шифрования сессий на сервере (если не задан, генерируется автоматически) |
+
+> Если не задавать `YANDEX_CLIENT_ID` / `YANDEX_CLIENT_SECRET`, можно авторизоваться напрямую по OAuth-токену Яндекса с правами `iot:view` и `iot:control`.
+
+### Скрипты
+- `npm run dev` — запуск сервера разработки (`server.ts` + Vite на порту 3000)
+- `npm run build` — сборка фронтенда в `dist/`
+- `npm run start` — запуск production-сервера
+- `npm run lint` — проверка типов TypeScript (`tsc --noEmit`)
+
+---
+
+## Настройка Яндекс OAuth
+
+1. Создайте приложение на [oauth.yandex.ru](https://oauth.yandex.ru/).
+2. Выберите платформу (веб-сервис или клиентское приложение для токена) и укажите права доступа к Умному дому:
+   - `iot:view` — просмотр устройств и сценариев
+   - `iot:control` — управление устройствами и запуск сценариев
+3. Укажите **Client ID** в приложении Android (или в `.env` для веб-версии).
+
+---
+
+## Безопасность
+
+- В репозитории **не хранятся** OAuth-токены, пароли, ключи подписи (`.jks` / `.keystore`) или файлы `.env`.
+- Локальные файлы окружения (`.env*`), серверное хранилище сессий (`.data/`), конфигурация Android Studio (`.idea/`, `local.properties`), кэш `.gradle/` и собранные артефакты (`build/`, `dist/`, `*.apk`, `*.aab`) исключены в `.gitignore`.
+- При публикации форков или релизных сборок **не добавляйте** в git файлы `.env`, `local.properties` и ключи подписи релизного APK (`*.jks`, `*.keystore`).

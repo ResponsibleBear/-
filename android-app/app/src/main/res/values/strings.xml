@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Алиса Дом</string>
+    <string name="widget_description">Быстрое управление выключателями Алисы с рабочего стола</string>
+    <string name="qs_tile_1_label">Алиса: Свет 1</string>
+    <string name="qs_tile_2_label">Алиса: Свет 2</string>
+    <string name="qs_tile_all_off_label">Алиса: Выкл всё</string>
+</resources>

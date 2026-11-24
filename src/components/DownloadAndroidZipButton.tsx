@@ -39,7 +39,7 @@ export function DownloadAndroidZipButton({ className = '' }: DownloadAndroidZipB
         type="button"
         onClick={handleDownload}
         disabled={downloading}
-        className={`min-h-[42px] px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 hover:opacity-90 disabled:opacity-60 text-white dark:text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 transition-opacity w-full cursor-pointer ${className}`}
+        className={`btn-3d-primary min-h-[48px] px-4 py-2.5 rounded-[18px] disabled:opacity-60 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all duration-120 w-full cursor-pointer ${className}`}
       >
         <Download className={`w-4 h-4 shrink-0 ${downloading ? 'animate-bounce' : ''}`} />
         <span>{downloading ? 'Подготовка архива...' : 'Скачать ZIP для Android Studio'}</span>

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   LayoutGrid,
+  Link2,
   Play,
+  Power,
   RefreshCw,
   Search,
   Settings,
@@ -13,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ConnectYandexScreen } from './components/ConnectYandexScreen';
 import { DeviceCard } from './components/DeviceCard';
+import { DoubleSwitchCard } from './components/DoubleSwitchCard';
 import { ScenariosView } from './components/ScenariosView';
 import { SettingsView, type ThemePreference } from './components/SettingsView';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -32,10 +35,12 @@ import {
   fetchSmartHomeInfo,
   logoutYandex,
   runYandexScenario,
+  sendBatchDeviceActions,
   sendDeviceActions,
   sendGroupActions,
   setSessionToken,
 } from './utils/api';
+import { groupDoubleSwitches, makeSortedPairKey } from './utils/switchGrouping';
 import {
   type DeviceCategoryKey,
   getDeviceCategory,
@@ -46,6 +51,31 @@ import {
 type ActiveTab = 'switches' | 'other' | 'scenarios' | 'settings';
 
 const PREFS_STORAGE_KEY = 'alice_android_prefs_v1';
+const SWITCH_PAIRS_STORAGE_KEY = 'alice_switch_pairs_v1';
+
+interface SavedSwitchPairs {
+  manualPairs: Array<[string, string]>;
+  blockedPairs: string[];
+}
+
+function loadSavedSwitchPairs(): SavedSwitchPairs {
+  try {
+    const raw = localStorage.getItem(SWITCH_PAIRS_STORAGE_KEY);
+    if (!raw) return { manualPairs: [], blockedPairs: [] };
+    const parsed = JSON.parse(raw) as Partial<SavedSwitchPairs>;
+    const manualPairs = Array.isArray(parsed.manualPairs)
+      ? parsed.manualPairs.filter(
+          (p): p is [string, string] => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string' && typeof p[1] === 'string'
+        )
+      : [];
+    const blockedPairs = Array.isArray(parsed.blockedPairs)
+      ? parsed.blockedPairs.filter((s): s is string => typeof s === 'string')
+      : [];
+    return { manualPairs, blockedPairs };
+  } catch {
+    return { manualPairs: [], blockedPairs: [] };
+  }
+}
 
 interface SavedPrefs {
   themePref: ThemePreference;
@@ -106,6 +136,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [busyDeviceIds, setBusyDeviceIds] = useState<Record<string, boolean>>({});
+  const initialPairs = useMemo(() => loadSavedSwitchPairs(), []);
+  const [manualPairs, setManualPairs] = useState<Array<[string, string]>>(initialPairs.manualPairs);
+  const [blockedPairKeys, setBlockedPairKeys] = useState<string[]>(initialPairs.blockedPairs);
+  const [pairingMode, setPairingMode] = useState(false);
+  const [firstPairCandidate, setFirstPairCandidate] = useState<YandexDevice | null>(null);
 
   // Persist UI preferences automatically
   useEffect(() => {
@@ -121,6 +156,18 @@ export default function App() {
       // Ignore storage quota errors
     }
   }, [themePref, hapticsEnabled, autoRefreshSec, selectedHouseholdId]);
+
+  useEffect(() => {
+    try {
+      const payload: SavedSwitchPairs = {
+        manualPairs,
+        blockedPairs: blockedPairKeys,
+      };
+      localStorage.setItem(SWITCH_PAIRS_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [manualPairs, blockedPairKeys]);
 
   // Android Vibration API haptics
   const hapticImpact = useCallback(
@@ -432,6 +479,101 @@ export default function App() {
     });
   }, [activeTab, switchDevices, otherDevices, selectedCategory, searchQuery]);
 
+  const blockedSet = useMemo(() => new Set(blockedPairKeys), [blockedPairKeys]);
+
+  const switchGridItems = useMemo(() => {
+    if (activeTab !== 'switches') return [];
+    return groupDoubleSwitches(filteredDevices, manualPairs, blockedSet);
+  }, [activeTab, filteredDevices, manualPairs, blockedSet]);
+
+  const activeSwitchIds = useMemo(
+    () => switchDevices.filter((d) => Boolean(getOnOffCapability(d)) && isDeviceOn(d)).map((d) => d.id),
+    [switchDevices]
+  );
+
+  const handleTurnOffAllSwitches = useCallback(async () => {
+    const idsToOff =
+      activeSwitchIds.length > 0
+        ? activeSwitchIds
+        : switchDevices.filter((d) => Boolean(getOnOffCapability(d))).map((d) => d.id);
+    if (idsToOff.length === 0) return;
+    hapticImpact('heavy');
+    const previousSnapshot = smartHome;
+    const offAction: DeviceAction = { type: 'devices.capabilities.on_off', state: { instance: 'on', value: false } };
+    setSmartHome((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        devices: prev.devices.map((dev) => {
+          if (!idsToOff.includes(dev.id)) return dev;
+          return {
+            ...dev,
+            capabilities: dev.capabilities.map((cap) =>
+              cap.type === 'devices.capabilities.on_off'
+                ? { ...cap, state: { instance: 'on', value: false } }
+                : cap
+            ),
+          };
+        }),
+      };
+    });
+    try {
+      await sendBatchDeviceActions(idsToOff, [offAction]);
+      hapticNotify('success');
+      showToast('Все выключатели отключены');
+    } catch (err: any) {
+      hapticNotify('error');
+      if (previousSnapshot) setSmartHome(previousSnapshot);
+      showToast(err?.message || 'Не удалось выключить устройства', true);
+    }
+  }, [activeSwitchIds, switchDevices, smartHome, hapticImpact, hapticNotify, showToast]);
+
+  const handleSelectForPair = useCallback(
+    (device: YandexDevice) => {
+      hapticImpact('light');
+      if (!firstPairCandidate) {
+        setFirstPairCandidate(device);
+        return;
+      }
+      if (firstPairCandidate.id === device.id) {
+        setFirstPairCandidate(null);
+        return;
+      }
+      const pKey = makeSortedPairKey(firstPairCandidate.id, device.id);
+      setBlockedPairKeys((prev) => prev.filter((k) => k !== pKey));
+      setManualPairs((prev) => {
+        const cleaned = prev.filter(
+          ([a, b]) =>
+            a !== firstPairCandidate.id &&
+            b !== firstPairCandidate.id &&
+            a !== device.id &&
+            b !== device.id
+        );
+        return [...cleaned, [firstPairCandidate.id, device.id]];
+      });
+      showToast(`Объединены: ${firstPairCandidate.name} + ${device.name}`);
+      setFirstPairCandidate(null);
+      setPairingMode(false);
+    },
+    [firstPairCandidate, hapticImpact, showToast]
+  );
+
+  const handleSplitPair = useCallback(
+    (left: YandexDevice, right: YandexDevice) => {
+      hapticImpact('medium');
+      const pKey = makeSortedPairKey(left.id, right.id);
+      setManualPairs((prev) =>
+        prev.filter(
+          ([a, b]) =>
+            !((a === left.id && b === right.id) || (a === right.id && b === left.id))
+        )
+      );
+      setBlockedPairKeys((prev) => (prev.includes(pKey) ? prev : [...prev, pKey]));
+      showToast(`Разъединено: ${left.name} и ${right.name}`);
+    },
+    [hapticImpact, showToast]
+  );
+
   const summaryStats = useMemo(() => {
     const targetList =
       activeTab === 'switches' ? switchDevices : activeTab === 'other' ? otherDevices : scopedDevices;
@@ -543,7 +685,7 @@ export default function App() {
               loadSmartHome();
             }}
             disabled={homeLoading}
-            className="min-h-[40px] px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-60 whitespace-nowrap shrink-0 cursor-pointer"
+            className="btn-3d-neutral h-[44px] px-4 rounded-[18px] text-slate-900 dark:text-slate-100 text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-60 whitespace-nowrap shrink-0 cursor-pointer transition-all duration-120"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${homeLoading ? 'animate-spin' : ''}`} />
             <span>Обновить</span>
@@ -553,35 +695,88 @@ export default function App() {
 
       {/* Main Content Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 md:pt-7 space-y-5">
-        {/* Scrollable Mobile Header / Household Hero Bar */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 truncate">
-              {activeTab === 'switches' && `Выключатели · ${activeHouseholdName}`}
-              {activeTab === 'other' && `Остальные устройства · ${activeHouseholdName}`}
-              {activeTab === 'scenarios' && 'Сценарии и группы'}
-              {activeTab === 'settings' && 'Настройки'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
-              {summaryStats.totalDevices} устройств · {summaryStats.activeCount} включено
-              {summaryStats.avgTemp ? ` · ${summaryStats.avgTemp}°C` : ''}
-              {summaryStats.avgHum !== null ? ` · ${summaryStats.avgHum}%` : ''}
-            </p>
-          </div>
+        {/* Scrollable Header / Stretched Turn-Off-All + Centered Icon Buttons */}
+        <div className="flex items-center gap-2.5 w-full">
+          {activeTab === 'switches' ? (
+            <>
+              <button
+                type="button"
+                onClick={handleTurnOffAllSwitches}
+                disabled={switchDevices.filter((d) => Boolean(getOnOffCapability(d))).length === 0}
+                className={`flex-1 h-[48px] px-5 rounded-[18px] text-sm font-bold flex items-center justify-center gap-2.5 whitespace-nowrap cursor-pointer disabled:opacity-50 transition-all duration-120 ${
+                  activeSwitchIds.length > 0
+                    ? 'btn-3d-primary text-white'
+                    : 'btn-3d-neutral text-slate-900 dark:text-slate-100'
+                }`}
+              >
+                <Power className="w-4 h-4 shrink-0" />
+                <span>Выключить все</span>
+              </button>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                hapticImpact('light');
-                loadSmartHome();
-              }}
-              aria-label="Обновить список устройств"
-              className="md:hidden min-w-[44px] min-h-[44px] rounded-2xl bg-white dark:bg-[#151a25] border border-slate-300/80 dark:border-[#273043] flex items-center justify-center text-slate-800 dark:text-slate-100 active:scale-95 shadow-xs cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${homeLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  hapticImpact('light');
+                  setActiveTab('settings');
+                }}
+                aria-label="Настройки"
+                className="btn-3d-neutral w-[48px] h-[48px] rounded-[18px] flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0 cursor-pointer transition-all duration-120"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  hapticImpact('light');
+                  loadSmartHome();
+                }}
+                aria-label="Обновить список устройств"
+                className="btn-3d-neutral w-[48px] h-[48px] rounded-[18px] flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0 cursor-pointer transition-all duration-120"
+              >
+                <RefreshCw className={`w-4 h-4 ${homeLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 truncate">
+                  {activeTab === 'other' && `Остальные устройства · ${activeHouseholdName}`}
+                  {activeTab === 'scenarios' && 'Сценарии и группы'}
+                  {activeTab === 'settings' && 'Настройки'}
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
+                  {summaryStats.totalDevices} устройств · {summaryStats.activeCount} включено
+                  {summaryStats.avgTemp ? ` · ${summaryStats.avgTemp}°C` : ''}
+                  {summaryStats.avgHum !== null ? ` · ${summaryStats.avgHum}%` : ''}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  hapticImpact('light');
+                  setActiveTab('settings');
+                }}
+                aria-label="Настройки"
+                className="md:hidden btn-3d-neutral w-[48px] h-[48px] rounded-[18px] flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0 cursor-pointer transition-all duration-120"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  hapticImpact('light');
+                  loadSmartHome();
+                }}
+                aria-label="Обновить список устройств"
+                className="md:hidden btn-3d-neutral w-[48px] h-[48px] rounded-[18px] flex items-center justify-center text-slate-800 dark:text-slate-100 shrink-0 cursor-pointer transition-all duration-120"
+              >
+                <RefreshCw className={`w-4 h-4 ${homeLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Offline Banner */}
@@ -608,7 +803,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => loadSmartHome()}
-              className="min-h-[36px] px-3 rounded-xl bg-red-600 text-white text-xs font-semibold shrink-0 cursor-pointer"
+              className="btn-3d-danger min-h-[40px] px-3.5 rounded-[16px] text-xs font-semibold shrink-0 cursor-pointer transition-all duration-120"
             >
               Повторить
             </button>
@@ -619,8 +814,29 @@ export default function App() {
         {(activeTab === 'switches' || activeTab === 'other') && (
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {activeTab === 'switches' && switchDevices.length >= 2 && (
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      hapticImpact('light');
+                      setPairingMode((v) => !v);
+                      setFirstPairCandidate(null);
+                    }}
+                    className={`min-h-[44px] px-4 py-2 rounded-[18px] text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer transition-all duration-120 ${
+                      pairingMode
+                        ? 'btn-3d-primary text-white'
+                        : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>{pairingMode ? 'Готово' : '2-клавишные'}</span>
+                  </button>
+                </div>
+              )}
+
               {activeTab === 'other' && (
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-2">
                   {CATEGORY_TABS.map((cat) => (
                     <button
                       key={cat.id}
@@ -629,10 +845,10 @@ export default function App() {
                         hapticImpact('light');
                         setSelectedCategory(cat.id);
                       }}
-                      className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                      className={`min-h-[42px] px-4 py-2 rounded-[18px] text-xs font-bold whitespace-nowrap shrink-0 transition-all duration-120 cursor-pointer ${
                         selectedCategory === cat.id
-                          ? 'bg-gradient-to-r from-[#3b82f6] to-[#1d4ed8] text-white shadow-sm shadow-blue-500/25'
-                          : 'bg-white dark:bg-[#151a25] border border-slate-300/80 dark:border-[#273043] text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-[#394661]'
+                          ? 'btn-3d-primary text-white'
+                          : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
                       }`}
                     >
                       {cat.label}
@@ -648,7 +864,7 @@ export default function App() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={activeTab === 'switches' ? 'Поиск выключателя...' : 'Поиск устройства...'}
-                  className="w-full min-h-[44px] pl-10 pr-9 py-2 rounded-2xl bg-white dark:bg-[#151a25] border border-slate-300/80 dark:border-[#273043] text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-[44px] pl-10 pr-9 py-2 rounded-[18px] bg-white dark:bg-[#151a25] border border-slate-300/80 dark:border-[#273043] text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {searchQuery && (
                   <button
@@ -663,17 +879,37 @@ export default function App() {
               </div>
             </div>
 
+            {activeTab === 'switches' && pairingMode && (
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-between gap-3 text-xs sm:text-sm text-slate-800 dark:text-slate-100">
+                <span>
+                  {firstPairCandidate
+                    ? `Выбран «${firstPairCandidate.name}». Нажмите на второй выключатель, чтобы объединить их в двухклавишный.`
+                    : 'Нажмите последовательно на 2 одиночных выключателя для объединения в двухклавишный блок, либо нажмите «Разъединить» на паре.'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPairingMode(false);
+                    setFirstPairCandidate(null);
+                  }}
+                  className="btn-3d-neutral min-h-[40px] px-3.5 rounded-[16px] text-xs font-bold shrink-0 cursor-pointer transition-all duration-120"
+                >
+                  Отмена
+                </button>
+              </div>
+            )}
+
             {homeLoading && !smartHome ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-[136px] rounded-2xl bg-white dark:bg-[#171c26] border border-slate-200/80 dark:border-white/[0.07] animate-pulse"
+                    className="h-[146px] rounded-[24px] keycap-3d-off animate-pulse"
                   />
                 ))}
               </div>
             ) : filteredDevices.length === 0 ? (
-              <div className="rounded-3xl bg-white dark:bg-[#151a25] border border-slate-300/80 dark:border-[#273043] p-8 text-center">
+              <div className="rounded-3xl keycap-3d-off p-8 text-center">
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
                   {scopedDevices.length === 0
                     ? 'В вашем Яндекс Доме пока нет устройств'
@@ -689,8 +925,41 @@ export default function App() {
                       : 'Попробуйте сбросить поиск или категорию.'}
                 </p>
               </div>
+            ) : activeTab === 'switches' ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                {switchGridItems.map((item) =>
+                  item.kind === 'double' ? (
+                    <DoubleSwitchCard
+                      key={item.pairKey}
+                      left={item.left}
+                      right={item.right}
+                      title={item.commonTitle}
+                      roomName={item.left.room ? roomNameMap.get(item.left.room) : undefined}
+                      busyDeviceIds={busyDeviceIds}
+                      pairingMode={pairingMode}
+                      onTogglePower={handleTogglePower}
+                      onSplitPair={handleSplitPair}
+                    />
+                  ) : (
+                    <DeviceCard
+                      key={item.device.id}
+                      device={item.device}
+                      roomName={item.device.room ? roomNameMap.get(item.device.room) : undefined}
+                      isBusy={Boolean(busyDeviceIds[item.device.id])}
+                      pairingMode={pairingMode}
+                      isPairSelected={firstPairCandidate?.id === item.device.id}
+                      onTogglePower={handleTogglePower}
+                      onSelectForPair={handleSelectForPair}
+                      onRefreshDevice={(d) => {
+                        hapticImpact('light');
+                        handleRefreshSingleDevice(d.id);
+                      }}
+                    />
+                  )
+                )}
+              </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
                 {filteredDevices.map((device) => (
                   <DeviceCard
                     key={device.id}

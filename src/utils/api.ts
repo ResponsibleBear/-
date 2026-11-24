@@ -121,6 +121,18 @@ export function sendDeviceActions(
   });
 }
 
+export function sendBatchDeviceActions(
+  deviceIds: string[],
+  actions: DeviceAction[]
+): Promise<{ status: string }> {
+  return apiFetch('/api/smart-home/devices/actions', {
+    method: 'POST',
+    body: JSON.stringify({
+      devices: deviceIds.map((id) => ({ id, actions })),
+    }),
+  });
+}
+
 export function sendGroupActions(groupId: string, actions: DeviceAction[]): Promise<{ status: string }> {
   return apiFetch(`/api/smart-home/groups/${encodeURIComponent(groupId)}/actions`, {
     method: 'POST',

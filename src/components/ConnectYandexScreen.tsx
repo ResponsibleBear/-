@@ -225,7 +225,7 @@ export function ConnectYandexScreen({
                 type="button"
                 onClick={handleOAuthConnect}
                 disabled={loadingOAuth || !config?.yandexOAuthConfigured}
-                className="w-full min-h-[48px] px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm sm:text-base transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                className="btn-3d-primary w-full min-h-[50px] px-5 py-3 rounded-[18px] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm sm:text-base transition-all duration-120 flex items-center justify-center gap-2.5 cursor-pointer"
               >
                 <ShieldCheck className="w-5 h-5 shrink-0" />
                 <span className="whitespace-nowrap">
@@ -257,7 +257,7 @@ export function ConnectYandexScreen({
                         <button
                           type="button"
                           onClick={handleOpenVerificationCodePopup}
-                          className="min-h-[36px] px-3 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 text-xs font-semibold shrink-0 cursor-pointer"
+                          className="btn-3d-neutral min-h-[38px] px-3.5 rounded-[16px] text-blue-600 dark:text-blue-400 text-xs font-bold shrink-0 cursor-pointer transition-all duration-120"
                         >
                           Получить код
                         </button>
@@ -268,12 +268,12 @@ export function ConnectYandexScreen({
                           value={verificationCode}
                           onChange={(e) => setVerificationCode(e.target.value)}
                           placeholder="Код с oauth.yandex.ru/verification_code"
-                          className="flex-1 min-h-[44px] px-3 rounded-xl bg-white dark:bg-[#171c26] border border-slate-200 dark:border-white/[0.1] text-sm font-mono-tabular text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                          className="flex-1 min-h-[46px] px-3 rounded-[16px] bg-white dark:bg-[#171c26] border border-slate-200 dark:border-white/[0.1] text-sm font-mono-tabular text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
                         />
                         <button
                           type="submit"
                           disabled={loadingCode || verificationCode.trim().length < 4}
-                          className="min-h-[44px] px-4 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+                          className="btn-3d-primary min-h-[46px] px-4 rounded-[16px] text-white text-xs font-bold disabled:opacity-40 cursor-pointer transition-all duration-120"
                         >
                           {loadingCode ? 'Вход...' : 'Войти'}
                         </button>
@@ -315,18 +315,18 @@ export function ConnectYandexScreen({
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                       Вставьте <span className="font-mono-tabular">Client ID</span> из вашего приложения на <span className="font-mono-tabular">oauth.yandex.ru</span> — Яндекс сразу покажет токен на экране:
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2.5">
                       <input
                         type="text"
                         value={clientIdHelper}
                         onChange={(e) => setClientIdHelper(e.target.value)}
                         placeholder="Client ID приложения Яндекса"
-                        className="flex-1 min-h-[42px] px-3 rounded-xl bg-white dark:bg-[#171c26] border border-slate-200 dark:border-white/[0.1] text-xs font-mono-tabular text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        className="flex-1 min-h-[44px] px-3 rounded-[16px] bg-white dark:bg-[#171c26] border border-slate-200 dark:border-white/[0.1] text-xs font-mono-tabular text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
                       />
                       <button
                         type="button"
                         onClick={handleOpenTokenHelper}
-                        className="min-h-[42px] px-3.5 rounded-xl bg-blue-600/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 text-xs font-semibold hover:bg-blue-600 hover:text-white transition-colors whitespace-nowrap cursor-pointer"
+                        className="btn-3d-neutral min-h-[44px] px-4 rounded-[16px] text-blue-600 dark:text-blue-400 text-xs font-bold whitespace-nowrap cursor-pointer transition-all duration-120"
                       >
                         Получить токен
                       </button>
@@ -344,12 +344,12 @@ export function ConnectYandexScreen({
                       onChange={(e) => setTokenInput(e.target.value)}
                       placeholder="y0_AgAAAA..."
                       autoComplete="off"
-                      className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-[#0e1117] border border-slate-200 dark:border-white/[0.1] text-sm font-mono-tabular text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      className="w-full min-h-[46px] px-3.5 py-2.5 rounded-[16px] bg-slate-50 dark:bg-[#0e1117] border border-slate-200 dark:border-white/[0.1] text-sm font-mono-tabular text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
                     />
                     <button
                       type="submit"
                       disabled={loadingToken || tokenInput.trim().length < 16}
-                      className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-semibold text-sm hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer"
+                      className="btn-3d-primary w-full min-h-[48px] px-4 py-2.5 rounded-[18px] text-white font-bold text-sm disabled:opacity-40 transition-all duration-120 cursor-pointer"
                     >
                       {loadingToken ? 'Проверяем токен...' : 'Подключить дом'}
                     </button>

@@ -21,7 +21,9 @@ data class SmartDevice(
     val isOn: Boolean,
     val brightness: Int?,
     val temperatureTarget: Int?,
-    val primarySensorText: String?
+    val primarySensorText: String?,
+    val externalId: String? = null,
+    val skillId: String? = null
 )
 data class SmartHomeSnapshot(
     val rooms: List<SmartRoom>,
@@ -228,7 +230,9 @@ class YandexSmartHomeClient {
                     isOn = isOn,
                     brightness = brightness,
                     temperatureTarget = tempTarget,
-                    primarySensorText = sensorText
+                    primarySensorText = sensorText,
+                    externalId = if (d.isNull("external_id")) null else d.optString("external_id").takeIf { it.isNotBlank() },
+                    skillId = if (d.isNull("skill_id")) null else d.optString("skill_id").takeIf { it.isNotBlank() }
                 )
             )
         }

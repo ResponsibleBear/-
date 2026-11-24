@@ -79,7 +79,7 @@ export function SettingsView({
           <button
             type="button"
             onClick={onLogout}
-            className="min-h-[44px] px-4 py-2 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-950/70 flex items-center gap-2 shrink-0 cursor-pointer"
+            className="btn-3d-danger min-h-[46px] px-4 py-2 rounded-[18px] text-xs font-bold flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-all duration-120"
           >
             <LogOut className="w-4 h-4" />
             <span>Выйти</span>
@@ -93,14 +93,14 @@ export function SettingsView({
               <Home className="w-3.5 h-3.5" />
               Активный дом (сохраняется автоматически)
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               <button
                 type="button"
                 onClick={() => onSelectHousehold('all')}
-                className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
+                className={`min-h-[44px] px-4 py-2 rounded-[18px] text-xs font-bold cursor-pointer transition-all duration-120 ${
                   selectedHouseholdId === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 dark:bg-white/[0.07] text-slate-700 dark:text-slate-200'
+                    ? 'btn-3d-primary text-white'
+                    : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
                 }`}
               >
                 Все дома
@@ -110,10 +110,10 @@ export function SettingsView({
                   key={h.id}
                   type="button"
                   onClick={() => onSelectHousehold(h.id)}
-                  className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
+                  className={`min-h-[44px] px-4 py-2 rounded-[18px] text-xs font-bold cursor-pointer transition-all duration-120 ${
                     selectedHouseholdId === h.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 dark:bg-white/[0.07] text-slate-700 dark:text-slate-200'
+                      ? 'btn-3d-primary text-white'
+                      : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
                   }`}
                 >
                   {h.name}
@@ -131,7 +131,7 @@ export function SettingsView({
         {/* Theme */}
         <div className="space-y-2">
           <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Тема оформления</div>
-          <div className="grid grid-cols-3 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-[#0e1117]">
+          <div className="grid grid-cols-3 gap-2.5">
             {[
               { id: 'auto' as const, label: 'Системная', icon: Smartphone },
               { id: 'light' as const, label: 'Светлая', icon: Sun },
@@ -144,10 +144,10 @@ export function SettingsView({
                   key={item.id}
                   type="button"
                   onClick={() => onChangeTheme(item.id)}
-                  className={`min-h-[42px] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] rounded-[18px] text-xs font-bold flex items-center justify-center gap-1.5 transition-all duration-120 cursor-pointer ${
                     active
-                      ? 'bg-white dark:bg-[#1e2533] text-slate-900 dark:text-slate-100 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400'
+                      ? 'btn-3d-primary text-white'
+                      : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -164,7 +164,7 @@ export function SettingsView({
             <RefreshCw className="w-3.5 h-3.5" />
             Автообновление статусов
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2.5">
             {[
               { sec: 0, label: 'Выкл' },
               { sec: 15, label: '15 сек' },
@@ -175,10 +175,10 @@ export function SettingsView({
                 key={opt.sec}
                 type="button"
                 onClick={() => onChangeAutoRefresh(opt.sec)}
-                className={`min-h-[42px] rounded-xl text-xs font-mono-tabular font-medium cursor-pointer ${
+                className={`min-h-[44px] rounded-[18px] text-xs font-mono-tabular font-bold cursor-pointer transition-all duration-120 ${
                   autoRefreshSec === opt.sec
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 dark:bg-white/[0.07] text-slate-700 dark:text-slate-200'
+                    ? 'btn-3d-primary text-white'
+                    : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
                 }`}
               >
                 {opt.label}

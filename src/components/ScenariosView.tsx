@@ -61,20 +61,20 @@ export function ScenariosView({ scenarios, groups, onRunScenario, onToggleGroup 
                   type="button"
                   disabled={isRunning}
                   onClick={() => handleRun(scenario)}
-                  className={`min-h-[72px] p-4 rounded-3xl border active:scale-[0.98] transition-all flex items-center justify-between gap-3 text-left cursor-pointer ${
+                  className={`min-h-[76px] p-4 rounded-[24px] transition-all duration-120 flex items-center justify-between gap-3 text-left cursor-pointer ${
                     isDone
-                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/20'
+                      ? 'keycap-3d-emerald text-white'
                       : isRunning
-                        ? 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] border-[#60a5fa]/40 text-white shadow-lg shadow-blue-500/25'
-                        : 'bg-white dark:bg-[#151a25] border-slate-300/80 dark:border-[#273043] hover:border-blue-500 shadow-xs'
+                        ? 'keycap-3d-blue text-white'
+                        : 'keycap-3d-off'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
                         isDone || isRunning
-                          ? 'bg-white/20 text-white'
-                          : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                          ? 'bg-white/22 text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.35)]'
+                          : 'bg-blue-500/12 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-inner'
                       }`}
                     >
                       {isDone ? <Check className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
@@ -101,7 +101,7 @@ export function ScenariosView({ scenarios, groups, onRunScenario, onToggleGroup 
                     className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                       isDone || isRunning
                         ? 'bg-white/20 text-white'
-                        : 'bg-slate-100 dark:bg-white/[0.08] text-slate-700 dark:text-slate-200'
+                        : 'btn-3d-neutral text-slate-700 dark:text-slate-200'
                     }`}
                   >
                     <Play className={`w-4 h-4 ${isRunning ? 'animate-pulse' : ''}`} />
@@ -123,11 +123,11 @@ export function ScenariosView({ scenarios, groups, onRunScenario, onToggleGroup 
         </div>
 
         {groups.length === 0 ? (
-          <div className="rounded-3xl bg-white dark:bg-[#151a25] border border-slate-300/80 dark:border-[#273043] p-6 text-sm text-slate-500 dark:text-slate-400">
+          <div className="rounded-3xl keycap-3d-off p-6 text-sm text-slate-500 dark:text-slate-400">
             Группы не настроены. Объедините светильники или розетки в группу в приложении Дом с Алисой для управления одним нажатием.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {groups.map((group) => {
               const hasOnOff = group.capabilities.some((c) => c.type === 'devices.capabilities.on_off');
               const isGroupOn = group.state === 'on' || group.capabilities.some((c) => c.type === 'devices.capabilities.on_off' && c.state?.value === true);
@@ -136,18 +136,18 @@ export function ScenariosView({ scenarios, groups, onRunScenario, onToggleGroup 
               return (
                 <div
                   key={group.id}
-                  className={`p-4 rounded-3xl border flex items-center justify-between gap-3 transition-all ${
+                  className={`p-4 rounded-[24px] flex items-center justify-between gap-3 transition-all ${
                     isGroupOn
-                      ? 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] border-[#60a5fa]/40 text-white shadow-lg shadow-blue-500/25'
-                      : 'bg-white dark:bg-[#151a25] border-slate-300/80 dark:border-[#273043] shadow-xs'
+                      ? 'keycap-3d-blue text-white'
+                      : 'keycap-3d-off'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
                         isGroupOn
-                          ? 'bg-white/20 text-white'
-                          : 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
+                          ? 'bg-white/22 text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.35)]'
+                          : 'bg-sky-500/12 text-sky-600 dark:text-sky-400 border border-sky-500/20 shadow-inner'
                       }`}
                     >
                       <Layers className="w-5 h-5" />
@@ -177,10 +177,10 @@ export function ScenariosView({ scenarios, groups, onRunScenario, onToggleGroup 
                         disabled={busy}
                         onClick={() => handleGroupPower(group, !isGroupOn)}
                         aria-label={`${isGroupOn ? 'Выключить' : 'Включить'} группу ${group.name}`}
-                        className={`min-w-[44px] min-h-[44px] px-3 rounded-2xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                        className={`min-w-[46px] min-h-[44px] px-3.5 rounded-[18px] text-xs font-bold transition-all duration-120 flex items-center justify-center gap-1.5 cursor-pointer ${
                           isGroupOn
-                            ? 'bg-white/20 hover:bg-white/30 text-white'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
+                            ? 'btn-3d-neutral text-slate-900 dark:text-slate-100'
+                            : 'btn-3d-primary text-white'
                         }`}
                       >
                         <Power className="w-4 h-4" />
